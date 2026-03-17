@@ -1,6 +1,6 @@
 import type { RenderContext } from '../../types.js';
-import { getModelName, getProviderLabel } from '../../stdin.js';
-import { cyan, dim, magenta, yellow, red } from '../colors.js';
+import { getModelName } from '../../stdin.js';
+import { cyan, dim, magenta, yellow } from '../colors.js';
 
 export function renderProjectLine(ctx: RenderContext): string | null {
   const display = ctx.config?.display;
@@ -8,19 +8,7 @@ export function renderProjectLine(ctx: RenderContext): string | null {
 
   if (display?.showModel !== false) {
     const model = getModelName(ctx.stdin);
-    const providerLabel = getProviderLabel(ctx.stdin);
-    const showUsage = display?.showUsage !== false;
-    const planName = showUsage ? ctx.usageData?.planName : undefined;
-    const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
-    const billingLabel = showUsage ? (planName ?? (hasApiKey ? red('API') : undefined)) : undefined;
-    const planDisplay = providerLabel ?? billingLabel;
-    const versionSuffix = display?.showVersion !== false && ctx.stdin.version
-      ? ` | v${ctx.stdin.version}`
-      : '';
-    const modelDisplay = planDisplay
-      ? `${model} | ${planDisplay}${versionSuffix}`
-      : `${model}${versionSuffix}`;
-    parts.push(cyan(`[${modelDisplay}]`));
+    parts.push(cyan(model));
   }
 
   let projectPart: string | null = null;
@@ -72,6 +60,10 @@ export function renderProjectLine(ctx: RenderContext): string | null {
     parts.push(projectPart);
   } else if (gitPart) {
     parts.push(gitPart);
+  }
+
+  if (display?.showVersion !== false && ctx.stdin.version) {
+    parts.push(cyan(`v${ctx.stdin.version}`));
   }
 
   if (display?.showSessionName && ctx.transcript.sessionName) {

@@ -75,7 +75,7 @@ export function getBufferedPercent(stdin) {
 export function getModelName(stdin) {
     const displayName = stdin.model?.display_name?.trim();
     if (displayName) {
-        return displayName;
+        return displayName.replace(/\s*\(.*\)$/, '');
     }
     const modelId = stdin.model?.id?.trim();
     if (!modelId) {

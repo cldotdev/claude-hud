@@ -1,7 +1,7 @@
 import { isLimitReached } from '../types.js';
 import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getTotalTokens } from '../stdin.js';
 import { getOutputSpeed } from '../speed-tracker.js';
-import { coloredBar, critical, cyan, dim, magenta, red, warning, yellow, getContextColor, getQuotaColor, quotaBar, RESET } from './colors.js';
+import { coloredBar, critical, cyan, dim, magenta, warning, yellow, getContextColor, getQuotaColor, quotaBar, RESET } from './colors.js';
 const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG === '*';
 /**
  * Renders the full session line (model + context bar + project + git + counts + usage + duration).
@@ -24,24 +24,12 @@ export function renderSessionLine(ctx) {
     const contextValue = formatContextValue(ctx, percent, contextValueMode);
     const contextValueDisplay = `${getContextColor(percent, colors)}${contextValue}${RESET}`;
     // Model and context bar (FIRST)
-    // Plan name only shows if showUsage is enabled (respects hybrid toggle)
     const providerLabel = getProviderLabel(ctx.stdin);
-    const showUsage = display?.showUsage !== false;
-    const planName = showUsage ? ctx.usageData?.planName : undefined;
-    const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
-    const billingLabel = showUsage ? (planName ?? (hasApiKey ? red('API') : undefined)) : undefined;
-    const planDisplay = providerLabel ?? billingLabel;
-    const versionSuffix = display?.showVersion !== false && ctx.stdin.version
-        ? ` | v${ctx.stdin.version}`
-        : '';
-    const modelDisplay = planDisplay
-        ? `${model} | ${planDisplay}${versionSuffix}`
-        : `${model}${versionSuffix}`;
     if (display?.showModel !== false && display?.showContextBar !== false) {
-        parts.push(`${cyan(`[${modelDisplay}]`)} ${bar} ${contextValueDisplay}`);
+        parts.push(`${cyan(model)} ${bar} ${contextValueDisplay}`);
     }
     else if (display?.showModel !== false) {
-        parts.push(`${cyan(`[${modelDisplay}]`)} ${contextValueDisplay}`);
+        parts.push(`${cyan(model)} ${contextValueDisplay}`);
     }
     else if (display?.showContextBar !== false) {
         parts.push(`${bar} ${contextValueDisplay}`);
@@ -104,6 +92,10 @@ export function renderSessionLine(ctx) {
     }
     else if (gitPart) {
         parts.push(gitPart);
+    }
+    // Version (after git status)
+    if (display?.showVersion !== false && ctx.stdin.version) {
+        parts.push(cyan(`v${ctx.stdin.version}`));
     }
     // Session name (custom title from /rename, or auto-generated slug)
     if (display?.showSessionName && ctx.transcript.sessionName) {

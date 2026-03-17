@@ -4,6 +4,7 @@ import type { GitStatus } from './git.js';
 export interface StdinData {
   transcript_path?: string;
   cwd?: string;
+  version?: string;
   model?: {
     id?: string;
     display_name?: string;

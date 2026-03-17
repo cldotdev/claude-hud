@@ -1,5 +1,5 @@
 import { getContextPercent, getBufferedPercent, getTotalTokens } from '../../stdin.js';
-import { coloredBar, dim, getContextColor, RESET } from '../colors.js';
+import { coloredBar, cyan, dim, getContextColor, RESET } from '../colors.js';
 const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG === '*';
 export function renderIdentityLine(ctx) {
     const rawPercent = getContextPercent(ctx.stdin);
@@ -15,8 +15,8 @@ export function renderIdentityLine(ctx) {
     const contextValue = formatContextValue(ctx, percent, contextValueMode);
     const contextValueDisplay = `${getContextColor(percent, colors)}${contextValue}${RESET}`;
     let line = display?.showContextBar !== false
-        ? `${dim('Context')} ${coloredBar(percent, 10, colors)} ${contextValueDisplay}`
-        : `${dim('Context')} ${contextValueDisplay}`;
+        ? `${cyan('Context')} ${coloredBar(percent, 10, colors)} ${contextValueDisplay}`
+        : `${cyan('Context')} ${contextValueDisplay}`;
     if (display?.showTokenBreakdown !== false && percent >= 85) {
         const usage = ctx.stdin.context_window?.current_usage;
         if (usage) {

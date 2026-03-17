@@ -11,7 +11,12 @@ export function renderProjectLine(ctx) {
         const hasApiKey = !!process.env.ANTHROPIC_API_KEY;
         const billingLabel = showUsage ? (planName ?? (hasApiKey ? red('API') : undefined)) : undefined;
         const planDisplay = providerLabel ?? billingLabel;
-        const modelDisplay = planDisplay ? `${model} | ${planDisplay}` : model;
+        const versionSuffix = display?.showVersion !== false && ctx.stdin.version
+            ? ` | v${ctx.stdin.version}`
+            : '';
+        const modelDisplay = planDisplay
+            ? `${model} | ${planDisplay}${versionSuffix}`
+            : `${model}${versionSuffix}`;
         parts.push(cyan(`[${modelDisplay}]`));
     }
     let projectPart = null;

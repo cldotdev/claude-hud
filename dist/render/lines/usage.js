@@ -1,6 +1,6 @@
 import { isLimitReached } from '../../types.js';
 import { getProviderLabel } from '../../stdin.js';
-import { critical, warning, dim, getQuotaColor, quotaBar, RESET } from '../colors.js';
+import { critical, warning, cyan, dim, getQuotaColor, quotaBar, RESET } from '../colors.js';
 export function renderUsageLine(ctx) {
     const display = ctx.config?.display;
     const colors = ctx.config?.colors;
@@ -13,7 +13,7 @@ export function renderUsageLine(ctx) {
     if (getProviderLabel(ctx.stdin)) {
         return null;
     }
-    const label = dim('Usage');
+    const label = cyan('Usage');
     if (ctx.usageData.apiUnavailable) {
         const errorHint = formatUsageError(ctx.usageData.apiError);
         return `${label} ${warning(`⚠${errorHint}`, colors)}`;

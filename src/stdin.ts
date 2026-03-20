@@ -32,16 +32,20 @@ export function getTotalTokens(stdin: StdinData): number {
   );
 }
 
+/** Clamp, round, and guard a percentage value to 0-100. */
+export function roundPercent(value?: number | null): number | null {
+  if (value === undefined || value === null || typeof value !== 'number' || Number.isNaN(value)) {
+    return null;
+  }
+  return Math.min(100, Math.max(0, Math.round(value)));
+}
+
 /**
  * Get native percentage from Claude Code v2.1.6+ if available.
  * Returns null if not available or invalid, triggering fallback to manual calculation.
  */
 function getNativePercent(stdin: StdinData): number | null {
-  const nativePercent = stdin.context_window?.used_percentage;
-  if (typeof nativePercent === 'number' && !Number.isNaN(nativePercent)) {
-    return Math.min(100, Math.max(0, Math.round(nativePercent)));
-  }
-  return null;
+  return roundPercent(stdin.context_window?.used_percentage);
 }
 
 export function getContextPercent(stdin: StdinData): number {

@@ -21,6 +21,10 @@ export interface StdinData {
     used_percentage?: number | null;
     remaining_percentage?: number | null;
   };
+  rate_limits?: {
+    five_hour?: { used_percentage?: number; resets_at?: number };
+    seven_day?: { used_percentage?: number; resets_at?: number };
+  } | null;
 }
 
 export interface ToolEntry {
@@ -47,25 +51,11 @@ export interface TodoItem {
   status: 'pending' | 'in_progress' | 'completed';
 }
 
-/** Usage window data from the OAuth API */
-export interface UsageWindow {
-  utilization: number | null;  // 0-100 percentage, null if unavailable
-  resetAt: Date | null;
-}
-
 export interface UsageData {
-  planName: string | null;  // 'Max', 'Pro', or null for API users
-  fiveHour: number | null;  // 0-100 percentage, null if unavailable
-  sevenDay: number | null;  // 0-100 percentage, null if unavailable
+  fiveHour: number | null;       // 0-100 rounded integer
+  sevenDay: number | null;       // 0-100 rounded integer
   fiveHourResetAt: Date | null;
   sevenDayResetAt: Date | null;
-  apiUnavailable?: boolean; // true if API call failed (user should check DEBUG logs)
-  apiError?: string; // short error reason (e.g., 401, timeout)
-}
-
-/** Check if usage limit is reached (either window at 100%) */
-export function isLimitReached(data: UsageData): boolean {
-  return data.fiveHour === 100 || data.sevenDay === 100;
 }
 
 export interface TranscriptData {

@@ -38,6 +38,7 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
 - `context_window.current_usage` - Token counts
 - `context_window.context_window_size` - Max context
 - `transcript_path` - Path to session transcript
+- `rate_limits.five_hour` / `rate_limits.seven_day` - Usage percentages and reset timestamps (Claude.ai subscribers only)
 
 **From transcript JSONL parsing**:
 - `tool_use` blocks → tool name, input, start time
@@ -51,14 +52,6 @@ Claude Code → stdin JSON → parse → render lines → stdout → Claude Code
 - Hooks count from `~/.claude/settings.json` (hooks)
 - Rules count from CLAUDE.md files
 
-**From OAuth credentials** (`~/.claude/.credentials.json`, when `display.showUsage` enabled):
-- `claudeAiOauth.accessToken` - OAuth token for API calls
-- `claudeAiOauth.subscriptionType` - User's plan (Pro, Max, Team)
-
-**From Anthropic Usage API** (`api.anthropic.com/api/oauth/usage`):
-- 5-hour and 7-day usage percentages
-- Reset timestamps (cached 60s success, 15s failure)
-
 ### File Structure
 
 ```
@@ -69,7 +62,7 @@ src/
 ├── config-reader.ts   # Read MCP/rules configs
 ├── config.ts          # Load/validate user config
 ├── git.ts             # Git status (branch, dirty, ahead/behind)
-├── usage-api.ts       # Fetch usage from Anthropic API
+├── usage.ts           # Extract usage from stdin rate_limits
 ├── types.ts           # TypeScript interfaces
 └── render/
     ├── index.ts       # Main render coordinator
@@ -89,7 +82,7 @@ src/
 ### Output Format (default expanded layout)
 
 ```
-[Opus | Max] │ my-project git:(main*)
+Opus │ my-project git:(main*)
 Context █████░░░░░ 45% │ Usage ██░░░░░░░░ 25% (1h 30m / 5h)
 ```
 

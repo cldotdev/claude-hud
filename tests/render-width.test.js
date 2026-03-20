@@ -128,7 +128,6 @@ test('render wraps long lines to terminal width and keeps all activity lines vis
   ctx.rulesCount = 2;
   ctx.hooksCount = 3;
   ctx.usageData = {
-    planName: 'Team',
     fiveHour: 30,
     sevenDay: 3,
     fiveHourResetAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
@@ -204,7 +203,7 @@ test('render prefers stdout columns over COLUMNS env fallback', () => {
   assert.ok(lines.some(line => displayWidth(line) > 10), 'stdout width should override COLUMNS fallback');
 });
 
-test('render does not split model/provider separator inside brackets', () => {
+test('render does not split model segment when truncating in narrow terminals', () => {
   const ctx = baseContext();
   ctx.stdin.model = { display_name: 'Sonnet', id: 'anthropic.claude-3-5-sonnet-20240620-v1:0' };
   ctx.config.display.showUsage = false;
@@ -217,7 +216,7 @@ test('render does not split model/provider separator inside brackets', () => {
     wideLines = captureRender(ctx);
   });
 
-  assert.ok(wideLines.some(line => line.includes('[Sonnet | Bedrock]')), 'model/provider badge should be preserved when width allows');
+  assert.ok(wideLines.some(line => line.includes('Sonnet')), 'model name should be preserved when width allows');
 
   let lines = [];
   withTerminal(12, () => {
@@ -225,7 +224,6 @@ test('render does not split model/provider separator inside brackets', () => {
   });
 
   assert.equal(lines.length, 1, 'single compact line should be truncated, not split');
-  assert.ok(!lines[0].startsWith('Bedrock]'), 'provider label should not become a wrapped prefix');
 });
 
 test('render clamps separator width in narrow terminals', () => {

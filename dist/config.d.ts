@@ -43,10 +43,6 @@ export interface HudConfig {
         sevenDayThreshold: number;
         environmentThreshold: number;
     };
-    usage: {
-        cacheTtlSeconds: number;
-        failureCacheTtlSeconds: number;
-    };
     colors: HudColorOverrides;
 }
 export declare const DEFAULT_CONFIG: HudConfig;

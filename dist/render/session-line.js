@@ -1,7 +1,7 @@
-import { isLimitReached } from '../types.js';
 import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, getTotalTokens } from '../stdin.js';
 import { getOutputSpeed } from '../speed-tracker.js';
-import { coloredBar, critical, cyan, dim, magenta, warning, yellow, getContextColor, getQuotaColor, quotaBar, RESET } from './colors.js';
+import { formatUsageDisplay } from './format.js';
+import { coloredBar, cyan, dim, magenta, yellow, getContextColor, RESET } from './colors.js';
 const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG === '*';
 /**
  * Renders the full session line (model + context bar + project + git + counts + usage + duration).
@@ -121,53 +121,10 @@ export function renderSessionLine(ctx) {
         }
     }
     // Usage limits display (shown when enabled in config, respects usageThreshold)
-    if (display?.showUsage !== false && ctx.usageData?.planName && !providerLabel) {
-        if (ctx.usageData.apiUnavailable) {
-            const errorHint = formatUsageError(ctx.usageData.apiError);
-            parts.push(warning(`usage: ⚠${errorHint}`, colors));
-        }
-        else if (isLimitReached(ctx.usageData)) {
-            const resetTime = ctx.usageData.fiveHour === 100
-                ? formatResetTime(ctx.usageData.fiveHourResetAt)
-                : formatResetTime(ctx.usageData.sevenDayResetAt);
-            parts.push(critical(`⚠ Limit reached${resetTime ? ` (resets ${resetTime})` : ''}`, colors));
-        }
-        else {
-            const usageThreshold = display?.usageThreshold ?? 0;
-            const fiveHour = ctx.usageData.fiveHour;
-            const sevenDay = ctx.usageData.sevenDay;
-            const effectiveUsage = Math.max(fiveHour ?? 0, sevenDay ?? 0);
-            if (effectiveUsage >= usageThreshold) {
-                const syncingSuffix = ctx.usageData.apiError === 'rate-limited'
-                    ? ` ${dim('(syncing...)')}`
-                    : '';
-                const fiveHourDisplay = formatUsagePercent(fiveHour, colors);
-                const fiveHourReset = formatResetTime(ctx.usageData.fiveHourResetAt);
-                const usageBarEnabled = display?.usageBarEnabled ?? true;
-                const fiveHourPart = usageBarEnabled
-                    ? (fiveHourReset
-                        ? `${quotaBar(fiveHour ?? 0, 10, colors)} ${fiveHourDisplay} (${fiveHourReset} / 5h)`
-                        : `${quotaBar(fiveHour ?? 0, 10, colors)} ${fiveHourDisplay}`)
-                    : (fiveHourReset
-                        ? `5h: ${fiveHourDisplay} (${fiveHourReset})`
-                        : `5h: ${fiveHourDisplay}`);
-                const sevenDayThreshold = display?.sevenDayThreshold ?? 80;
-                if (sevenDay !== null && sevenDay >= sevenDayThreshold) {
-                    const sevenDayDisplay = formatUsagePercent(sevenDay, colors);
-                    const sevenDayReset = formatResetTime(ctx.usageData.sevenDayResetAt);
-                    const sevenDayPart = usageBarEnabled
-                        ? (sevenDayReset
-                            ? `${quotaBar(sevenDay, 10, colors)} ${sevenDayDisplay} (${sevenDayReset} / 7d)`
-                            : `${quotaBar(sevenDay, 10, colors)} ${sevenDayDisplay}`)
-                        : (sevenDayReset
-                            ? `7d: ${sevenDayDisplay} (${sevenDayReset})`
-                            : `7d: ${sevenDayDisplay}`);
-                    parts.push(`${fiveHourPart} | ${sevenDayPart}${syncingSuffix}`);
-                }
-                else {
-                    parts.push(`${fiveHourPart}${syncingSuffix}`);
-                }
-            }
+    if (display?.showUsage !== false && ctx.usageData && !providerLabel) {
+        const usageContent = formatUsageDisplay(ctx.usageData, display, colors);
+        if (usageContent) {
+            parts.push(usageContent);
         }
     }
     // Session duration
@@ -217,42 +174,5 @@ function formatContextValue(ctx, percent, mode) {
         return `${Math.max(0, 100 - percent)}%`;
     }
     return `${percent}%`;
-}
-function formatUsagePercent(percent, colors) {
-    if (percent === null) {
-        return dim('--');
-    }
-    const color = getQuotaColor(percent, colors);
-    return `${color}${percent}%${RESET}`;
-}
-function formatUsageError(error) {
-    if (!error)
-        return '';
-    if (error === 'rate-limited')
-        return ' (syncing...)';
-    if (error.startsWith('http-'))
-        return ` (${error.slice(5)})`;
-    return ` (${error})`;
-}
-function formatResetTime(resetAt) {
-    if (!resetAt)
-        return '';
-    const now = new Date();
-    const diffMs = resetAt.getTime() - now.getTime();
-    if (diffMs <= 0)
-        return '';
-    const diffMins = Math.ceil(diffMs / 60000);
-    if (diffMins < 60)
-        return `${diffMins}m`;
-    const hours = Math.floor(diffMins / 60);
-    const mins = diffMins % 60;
-    if (hours >= 24) {
-        const days = Math.floor(hours / 24);
-        const remHours = hours % 24;
-        if (remHours > 0)
-            return `${days}d ${remHours}h`;
-        return `${days}d`;
-    }
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 //# sourceMappingURL=session-line.js.map

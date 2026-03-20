@@ -3,7 +3,7 @@ import { parseTranscript } from './transcript.js';
 import { render } from './render/index.js';
 import { countConfigs } from './config-reader.js';
 import { getGitStatus } from './git.js';
-import { getUsage } from './usage-api.js';
+import { extractUsage } from './usage.js';
 import { loadConfig } from './config.js';
 import { parseExtraCmdArg, runExtraCmd } from './extra-cmd.js';
 import { fileURLToPath } from 'node:url';
@@ -14,7 +14,7 @@ export async function main(overrides = {}) {
         parseTranscript,
         countConfigs,
         getGitStatus,
-        getUsage,
+        extractUsage,
         loadConfig,
         parseExtraCmdArg,
         runExtraCmd,
@@ -38,12 +38,7 @@ export async function main(overrides = {}) {
             : null;
         // Only fetch usage if enabled in config (replaces env var requirement)
         const usageData = config.display.showUsage !== false
-            ? await deps.getUsage({
-                ttls: {
-                    cacheTtlMs: config.usage.cacheTtlSeconds * 1000,
-                    failureCacheTtlMs: config.usage.failureCacheTtlSeconds * 1000,
-                },
-            })
+            ? deps.extractUsage(stdin)
             : null;
         const extraCmd = deps.parseExtraCmdArg();
         const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;

@@ -164,7 +164,7 @@ test('renderSessionLine handles root path gracefully', () => {
   const ctx = baseContext();
   ctx.stdin.cwd = '/';
   const line = renderSessionLine(ctx);
-  assert.ok(line.includes('[Opus]'));
+  assert.ok(line.includes('Opus'));
 });
 
 test('renderSessionLine supports token-based context display', () => {
@@ -210,7 +210,7 @@ test('renderSessionLine omits project name when cwd is undefined', () => {
   const ctx = baseContext();
   ctx.stdin.cwd = undefined;
   const line = renderSessionLine(ctx);
-  assert.ok(line.includes('[Opus]'));
+  assert.ok(line.includes('Opus'));
 });
 
 test('renderSessionLine includes session name when showSessionName is true', () => {
@@ -507,75 +507,11 @@ test('renderToolsLine returns null when no tools exist', () => {
 });
 
 // Usage display tests
-test('renderSessionLine displays plan name in model bracket', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Max',
-    fiveHour: 23,
-    sevenDay: 45,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-  };
-  const line = renderSessionLine(ctx);
-  assert.ok(line.includes('Opus'), 'should include model name');
-  assert.ok(line.includes('Max'), 'should include plan name');
-});
 
-test('renderSessionLine prefers subscription plan over API env var', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Max',
-    fiveHour: 23,
-    sevenDay: 45,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-  };
-  const savedApiKey = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = 'test-key';
-
-  try {
-    const line = renderSessionLine(ctx);
-    assert.ok(line.includes('Max'), 'should include plan label');
-    assert.ok(!line.includes('API'), 'should not include API label when plan is known');
-  } finally {
-    if (savedApiKey === undefined) {
-      delete process.env.ANTHROPIC_API_KEY;
-    } else {
-      process.env.ANTHROPIC_API_KEY = savedApiKey;
-    }
-  }
-});
-
-test('renderProjectLine prefers subscription plan over API env var', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Pro',
-    fiveHour: 10,
-    sevenDay: 20,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-  };
-  const savedApiKey = process.env.ANTHROPIC_API_KEY;
-  process.env.ANTHROPIC_API_KEY = 'test-key';
-
-  try {
-    const line = renderProjectLine(ctx);
-    assert.ok(line?.includes('Pro'), 'should include plan label');
-    assert.ok(!line?.includes('API'), 'should not include API label when plan is known');
-  } finally {
-    if (savedApiKey === undefined) {
-      delete process.env.ANTHROPIC_API_KEY;
-    } else {
-      process.env.ANTHROPIC_API_KEY = savedApiKey;
-    }
-  }
-});
-
-test('renderSessionLine shows Bedrock label and hides usage for bedrock model ids', () => {
+test('renderSessionLine hides usage for bedrock model ids', () => {
   const ctx = baseContext();
   ctx.stdin.model = { display_name: 'Sonnet', id: 'anthropic.claude-3-5-sonnet-20240620-v1:0' };
   ctx.usageData = {
-    planName: 'Max',
     fiveHour: 23,
     sevenDay: 45,
     fiveHourResetAt: null,
@@ -583,7 +519,6 @@ test('renderSessionLine shows Bedrock label and hides usage for bedrock model id
   };
   const line = renderSessionLine(ctx);
   assert.ok(line.includes('Sonnet'), 'should include model name');
-  assert.ok(line.includes('Bedrock'), 'should include Bedrock label');
   assert.ok(!line.includes('5h:'), 'should hide usage display');
 });
 
@@ -591,7 +526,6 @@ test('renderSessionLine displays usage percentages (7d hidden when low)', () => 
   const ctx = baseContext();
   ctx.config.display.sevenDayThreshold = 80;
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 6,
     sevenDay: 13,
     fiveHourResetAt: null,
@@ -607,7 +541,6 @@ test('renderSessionLine shows 7d when approaching limit (>=80%)', () => {
   const ctx = baseContext();
   ctx.config.display.sevenDayThreshold = 80;
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 45,
     sevenDay: 85,
     fiveHourResetAt: null,
@@ -625,7 +558,6 @@ test('renderSessionLine shows 7d reset countdown in text-only mode', () => {
   ctx.config.display.sevenDayThreshold = 80;
   ctx.config.display.usageBarEnabled = false;
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 45,
     sevenDay: 85,
     fiveHourResetAt: null,
@@ -641,7 +573,6 @@ test('renderSessionLine respects sevenDayThreshold override', () => {
   const ctx = baseContext();
   ctx.config.display.sevenDayThreshold = 0;
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 10,
     sevenDay: 5,
     fiveHourResetAt: null,
@@ -656,7 +587,6 @@ test('renderSessionLine shows 5hr reset countdown', () => {
   const ctx = baseContext();
   const resetTime = new Date(Date.now() + 7200000); // 2 hours from now
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 45,
     sevenDay: 20,
     fiveHourResetAt: resetTime,
@@ -671,7 +601,6 @@ test('renderUsageLine shows reset countdown in days when >= 24 hours', () => {
   const ctx = baseContext();
   const resetTime = new Date(Date.now() + (151 * 3600000) + (59 * 60000)); // 6d 7h 59m from now
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 45,
     sevenDay: 20,
     fiveHourResetAt: resetTime,
@@ -690,7 +619,6 @@ test('renderUsageLine shows 7d reset countdown in text-only mode', () => {
   ctx.config.display.usageBarEnabled = false;
   ctx.config.display.sevenDayThreshold = 80;
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 45,
     sevenDay: 85,
     fiveHourResetAt: null,
@@ -707,7 +635,6 @@ test('renderSessionLine displays limit reached warning', () => {
   const ctx = baseContext();
   const resetTime = new Date(Date.now() + 3600000); // 1 hour from now
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 100,
     sevenDay: 45,
     fiveHourResetAt: resetTime,
@@ -722,7 +649,6 @@ test('renderUsageLine shows limit reset in days when >= 24 hours', () => {
   const ctx = baseContext();
   const resetTime = new Date(Date.now() + (151 * 3600000) + (59 * 60000)); // 6d 7h 59m from now
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 100,
     sevenDay: 45,
     fiveHourResetAt: resetTime,
@@ -739,7 +665,6 @@ test('renderUsageLine shows limit reset in days when >= 24 hours', () => {
 test('renderSessionLine displays -- for null usage values', () => {
   const ctx = baseContext();
   ctx.usageData = {
-    planName: 'Max',
     fiveHour: null,
     sevenDay: null,
     fiveHourResetAt: null,
@@ -758,63 +683,7 @@ test('renderSessionLine omits usage when usageData is null', () => {
   assert.ok(!line.includes('7d:'), 'should not include 7d label');
 });
 
-test('renderSessionLine displays warning when API is unavailable', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Max',
-    fiveHour: null,
-    sevenDay: null,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-    apiUnavailable: true,
-    apiError: 'http-401',
-  };
-  const line = renderSessionLine(ctx);
-  assert.ok(line.includes('usage:'), 'should show usage label');
-  assert.ok(line.includes('⚠'), 'should show warning indicator');
-  assert.ok(line.includes('401'), 'should include error code');
-  assert.ok(!line.includes('5h:'), 'should not show 5h when API unavailable');
-});
-
-test('renderSessionLine shows syncing hint when usage API is rate-limited', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Max',
-    fiveHour: null,
-    sevenDay: null,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-    apiUnavailable: true,
-    apiError: 'rate-limited',
-  };
-  const line = renderSessionLine(ctx);
-  assert.ok(line.includes('usage:'), 'should show usage label');
-  assert.ok(line.includes('syncing...'), 'should show syncing hint for rate limiting');
-  assert.ok(!line.includes('rate-limited'), 'should not expose raw rate-limit error key');
-});
-
-test('renderSessionLine keeps stale usage visible while rate-limited', () => {
-  const ctx = baseContext();
-  ctx.usageData = {
-    planName: 'Max',
-    fiveHour: 25,
-    sevenDay: 85,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-    apiError: 'rate-limited',
-  };
-  const compactLine = renderSessionLine(ctx);
-  assert.ok(compactLine.includes('25%'), 'should keep the last successful 5h usage visible');
-  assert.ok(compactLine.includes('85%'), 'should keep the last successful 7d usage visible');
-  assert.ok(compactLine.includes('syncing...'), 'should show syncing hint alongside stale usage');
-
-  const usageLine = renderUsageLine(ctx);
-  assert.ok(usageLine?.includes('25%'), 'expanded usage line should keep stale 5h usage visible');
-  assert.ok(usageLine?.includes('85%'), 'expanded usage line should keep stale 7d usage visible');
-  assert.ok(usageLine?.includes('syncing...'), 'expanded usage line should show syncing hint');
-});
-
-test('renderSessionLine uses custom warning and critical colors for usage states', () => {
+test('renderSessionLine uses custom critical color for limit reached', () => {
   const ctx = baseContext();
   ctx.config.colors = {
     context: 'green',
@@ -824,20 +693,6 @@ test('renderSessionLine uses custom warning and critical colors for usage states
     critical: 'magenta',
   };
   ctx.usageData = {
-    planName: 'Max',
-    fiveHour: null,
-    sevenDay: null,
-    fiveHourResetAt: null,
-    sevenDayResetAt: null,
-    apiUnavailable: true,
-    apiError: 'http-401',
-  };
-
-  const warningLine = renderSessionLine(ctx);
-  assert.ok(warningLine.includes('\x1b[36musage: ⚠ (401)\x1b[0m'), `expected custom warning color, got: ${JSON.stringify(warningLine)}`);
-
-  ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 100,
     sevenDay: 45,
     fiveHourResetAt: new Date(Date.now() + 3600000),
@@ -859,7 +714,6 @@ test('renderUsageLine uses custom usage palette overrides', () => {
     critical: 'red',
   };
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 25,
     sevenDay: 80,
     fiveHourResetAt: null,
@@ -877,7 +731,6 @@ test('renderUsageLine uses custom usage palette overrides', () => {
 test('renderSessionLine hides usage when showUsage config is false (hybrid toggle)', () => {
   const ctx = baseContext();
   ctx.usageData = {
-    planName: 'Pro',
     fiveHour: 25,
     sevenDay: 10,
     fiveHourResetAt: null,
@@ -887,7 +740,6 @@ test('renderSessionLine hides usage when showUsage config is false (hybrid toggl
   ctx.config.display.showUsage = false;
   const line = renderSessionLine(ctx);
   assert.ok(!line.includes('5h:'), 'should not show usage when showUsage is false');
-  assert.ok(!line.includes('Pro'), 'should not show plan name when showUsage is false');
 });
 
 test('renderSessionLine uses buffered percent when autocompactBuffer is enabled', () => {
@@ -1058,7 +910,6 @@ test('render expanded layout honors custom elementOrder including activity place
   ctx.config.lineLayout = 'expanded';
   ctx.stdin.cwd = '/tmp/my-project';
   ctx.usageData = {
-    planName: 'Team',
     fiveHour: 30,
     sevenDay: 10,
     fiveHourResetAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -1102,7 +953,6 @@ test('render expanded layout omits elements not present in elementOrder', () => 
   ctx.config.lineLayout = 'expanded';
   ctx.stdin.cwd = '/tmp/my-project';
   ctx.usageData = {
-    planName: 'Team',
     fiveHour: 30,
     sevenDay: 10,
     fiveHourResetAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -1135,7 +985,6 @@ test('render expanded layout combines usage and context when adjacent in element
   const ctx = baseContext();
   ctx.config.lineLayout = 'expanded';
   ctx.usageData = {
-    planName: 'Team',
     fiveHour: 30,
     sevenDay: 10,
     fiveHourResetAt: new Date(Date.now() + 60 * 60 * 1000),
@@ -1156,7 +1005,6 @@ test('render expanded layout keeps usage and context separate when not adjacent'
   ctx.config.lineLayout = 'expanded';
   ctx.stdin.cwd = '/tmp/my-project';
   ctx.usageData = {
-    planName: 'Team',
     fiveHour: 30,
     sevenDay: 10,
     fiveHourResetAt: new Date(Date.now() + 60 * 60 * 1000),

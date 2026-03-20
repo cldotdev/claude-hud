@@ -64,10 +64,10 @@ Claude HUD gives you better insights into what's happening in your Claude Code s
 
 ### Default (2 lines)
 ```
-[Opus | Max] │ my-project git:(main*)
+[Opus] │ my-project git:(main*)
 Context █████░░░░░ 45% │ Usage ██░░░░░░░░ 25% (1h 30m / 5h)
 ```
-- **Line 1** — Model, plan name (or `Bedrock`), project path, git branch
+- **Line 1** — Model (or `Bedrock`), project path, git branch
 - **Line 2** — Context bar (green → yellow → red) and usage rate limits
 
 ### Optional lines (enable via `/claude-hud:configure`)
@@ -151,8 +151,6 @@ Edit `~/.claude/plugins/claude-hud/config.json` directly for advanced settings s
 | `display.showAgents` | boolean | false | Show agents activity line |
 | `display.showTodos` | boolean | false | Show todos progress line |
 | `display.showSessionName` | boolean | false | Show session slug or custom title from `/rename` |
-| `usage.cacheTtlSeconds` | number | 60 | How long (seconds) to cache a successful usage API response |
-| `usage.failureCacheTtlSeconds` | number | 15 | How long (seconds) to cache a failed usage API response before retrying |
 | `colors.context` | color name | `green` | Base color for the context bar and context percentage |
 | `colors.usage` | color name | `brightBlue` | Base color for usage bars and percentages below warning thresholds |
 | `colors.warning` | color name | `yellow` | Warning color for context thresholds and usage warning text |
@@ -175,16 +173,13 @@ To disable, set `display.showUsage` to `false`.
 
 **Requirements:**
 - Claude Pro, Max, or Team subscription (not available for API users)
-- OAuth credentials from Claude Code (created automatically when you log in)
+- Usage data is provided natively by Claude Code via stdin (no additional setup needed)
 
 **Troubleshooting:** If usage doesn't appear:
 - Ensure you're logged in with a Pro/Max/Team account (not API key)
 - Check `display.showUsage` is not set to `false` in config
 - API users see no usage display (they have pay-per-token, not rate limits)
 - AWS Bedrock models display `Bedrock` and hide usage limits (usage is managed in AWS)
-- Non-default `ANTHROPIC_BASE_URL` / `ANTHROPIC_API_BASE_URL` settings skip usage display, because the Anthropic OAuth usage API may not apply
-- If you are behind a proxy, set `HTTPS_PROXY` (or `HTTP_PROXY`/`ALL_PROXY`) and optional `NO_PROXY`
-- For high-latency environments, increase usage API timeout with `CLAUDE_HUD_USAGE_TIMEOUT_MS` (milliseconds)
 
 ### Example Configuration
 
@@ -212,10 +207,6 @@ To disable, set `display.showUsage` to `false`.
     "warning": "yellow",
     "usageWarning": "magenta",
     "critical": "red"
-  },
-  "usage": {
-    "cacheTtlSeconds": 120,
-    "failureCacheTtlSeconds": 30
   }
 }
 ```

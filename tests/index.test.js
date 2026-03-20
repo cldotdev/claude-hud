@@ -36,8 +36,7 @@ test('main logs an error when dependencies throw', async () => {
     },
     parseTranscript: async () => ({ tools: [], agents: [], todos: [] }),
     countConfigs: async () => ({ claudeMdCount: 0, rulesCount: 0, mcpCount: 0, hooksCount: 0 }),
-    getGitBranch: async () => null,
-    getUsage: async () => null,
+    extractUsage: () => null,
     render: () => {},
     now: () => Date.now(),
     log: (...args) => logs.push(args.join(' ')),
@@ -54,8 +53,7 @@ test('main logs unknown error for non-Error throws', async () => {
     },
     parseTranscript: async () => ({ tools: [], agents: [], todos: [] }),
     countConfigs: async () => ({ claudeMdCount: 0, rulesCount: 0, mcpCount: 0, hooksCount: 0 }),
-    getGitBranch: async () => null,
-    getUsage: async () => null,
+    extractUsage: () => null,
     render: () => {},
     now: () => Date.now(),
     log: (...args) => logs.push(args.join(' ')),
@@ -98,8 +96,7 @@ test('main executes the happy path with default dependencies', async () => {
       }),
       parseTranscript: async () => ({ tools: [], agents: [], todos: [], sessionStart: new Date(0) }),
       countConfigs: async () => ({ claudeMdCount: 0, rulesCount: 0, mcpCount: 0, hooksCount: 0 }),
-      getGitBranch: async () => null,
-      getUsage: async () => null,
+      extractUsage: () => null,
       render: (ctx) => {
         renderedContext = ctx;
       },
@@ -123,14 +120,13 @@ test('main includes git status in render context', async () => {
     parseTranscript: async () => ({ tools: [], agents: [], todos: [] }),
     countConfigs: async () => ({ claudeMdCount: 0, rulesCount: 0, mcpCount: 0, hooksCount: 0 }),
     getGitStatus: async () => ({ branch: 'feature/test', isDirty: false, ahead: 0, behind: 0 }),
-    getUsage: async () => null,
+    extractUsage: () => null,
     loadConfig: async () => ({
       lineLayout: 'compact',
       showSeparators: false,
       pathLevels: 1,
       gitStatus: { enabled: true, showDirty: true, showAheadBehind: false, showFileStats: false },
       display: { showModel: true, showContextBar: true, contextValue: 'percent', showConfigCounts: true, showDuration: true, showSpeed: false, showTokenBreakdown: true, showUsage: true, showTools: true, showAgents: true, showTodos: true, autocompactBuffer: 'enabled', usageThreshold: 0, sevenDayThreshold: 80, environmentThreshold: 0 },
-      usage: { cacheTtlSeconds: 60, failureCacheTtlSeconds: 15 },
     }),
     render: (ctx) => {
       renderedContext = ctx;
@@ -143,12 +139,10 @@ test('main includes git status in render context', async () => {
 test('main includes usageData in render context', async () => {
   let renderedContext;
   const mockUsageData = {
-    planName: 'Max',
     fiveHour: 50,
     sevenDay: 25,
     fiveHourResetAt: null,
     sevenDayResetAt: null,
-    limitReached: false,
   };
 
   await main({
@@ -158,8 +152,7 @@ test('main includes usageData in render context', async () => {
     }),
     parseTranscript: async () => ({ tools: [], agents: [], todos: [] }),
     countConfigs: async () => ({ claudeMdCount: 0, rulesCount: 0, mcpCount: 0, hooksCount: 0 }),
-    getGitBranch: async () => null,
-    getUsage: async () => mockUsageData,
+    extractUsage: () => mockUsageData,
     render: (ctx) => {
       renderedContext = ctx;
     },

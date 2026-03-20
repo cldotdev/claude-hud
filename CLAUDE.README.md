@@ -124,6 +124,8 @@ Technical documentation for agents who need to understand, modify, or debug Clau
       <field path="context_window.context_window_size">Maximum context size</field>
       <field path="transcript_path">Path to session transcript JSONL file</field>
       <field path="cwd">Current working directory</field>
+      <field path="rate_limits.five_hour">5-hour usage percentage and reset timestamp (Claude.ai subscribers only)</field>
+      <field path="rate_limits.seven_day">7-day usage percentage and reset timestamp (Claude.ai subscribers only)</field>
     </stdin_json>
 
     <transcript_jsonl description="Parsed from transcript file">
@@ -170,10 +172,9 @@ Technical documentation for agents who need to understand, modify, or debug Clau
       Gets branch name, dirty state, and ahead/behind counts.
       Uses execFile with array args for safe command execution.
     </file>
-    <file name="usage-api.ts" purpose="Fetch usage from Anthropic API">
-      Reads OAuth credentials from ~/.claude/.credentials.json.
-      Calls api.anthropic.com/api/oauth/usage endpoint (opt-in).
-      Caches results (60s success, 15s failure).
+    <file name="usage.ts" purpose="Extract usage from stdin rate_limits">
+      Parses rate_limits from stdin JSON data.
+      Returns 5-hour and 7-day usage percentages and reset timestamps.
     </file>
     <file name="types.ts" purpose="TypeScript interfaces">
       StdinData, ToolEntry, AgentEntry, TodoItem, TranscriptData, RenderContext.
@@ -186,7 +187,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
       Conditionally shows lines based on data presence.
     </file>
     <file name="session-line.ts" purpose="Line 1: Session info">
-      Renders: [Model | Plan] █████░░░░░ 45% | project git:(branch) | 2 CLAUDE.md | 5h: 25% | ⏱️ 5m
+      Renders: [Model] █████░░░░░ 45% | project git:(branch) | 2 CLAUDE.md | 5h: 25% | ⏱️ 5m
       Context bar colors: green (&lt;70%), yellow (70-85%), red (&gt;85%).
     </file>
     <file name="tools-line.ts" purpose="Line 2: Tool activity">
@@ -210,7 +211,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
 
 <output_format>
   <line number="1" name="session" always_shown="true">
-    [Model | Plan] █████░░░░░ 45% | project git:(branch) | 2 CLAUDE.md | 5h: 25% | ⏱️ 5m
+    [Model] █████░░░░░ 45% | project git:(branch) | 2 CLAUDE.md | 5h: 25% | ⏱️ 5m
   </line>
   <line number="2" name="tools" shown_if="any tools used">
     ◐ Edit: auth.ts | ✓ Read ×3 | ✓ Grep ×2

@@ -3,6 +3,7 @@ import { getContextPercent, getBufferedPercent, getModelName, getProviderLabel, 
 import { getOutputSpeed } from '../speed-tracker.js';
 import { formatUsageDisplay } from './format.js';
 import { coloredBar, cyan, dim, magenta, yellow, getContextColor, RESET } from './colors.js';
+import { getAdaptiveBarWidth } from '../utils/terminal.js';
 
 const DEBUG = process.env.DEBUG?.includes('claude-hud') || process.env.DEBUG === '*';
 
@@ -23,7 +24,8 @@ export function renderSessionLine(ctx: RenderContext): string {
   }
 
   const colors = ctx.config?.colors;
-  const bar = coloredBar(percent, 10, colors);
+  const barWidth = getAdaptiveBarWidth();
+  const bar = coloredBar(percent, barWidth, colors);
 
   const parts: string[] = [];
   const display = ctx.config?.display;

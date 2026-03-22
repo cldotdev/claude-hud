@@ -566,7 +566,7 @@ test('renderSessionLine shows 7d reset countdown in text-only mode', () => {
 
   const line = stripAnsi(renderSessionLine(ctx));
   assert.ok(line.includes('7d: 85%'), `should include 7d label and percentage: ${line}`);
-  assert.ok(line.includes('(1d 4h)'), `should include 7d reset countdown in text-only mode: ${line}`);
+  assert.ok(line.includes('(resets in 1d 4h)'), `should include 7d reset countdown in text-only mode: ${line}`);
 });
 
 test('renderSessionLine respects sevenDayThreshold override', () => {
@@ -609,7 +609,7 @@ test('renderUsageLine shows reset countdown in days when >= 24 hours', () => {
   const line = renderUsageLine(ctx);
   assert.ok(line, 'should render usage line');
   const plain = stripAnsi(line);
-  assert.ok(/\(\d+d( \d+h)?\)/.test(plain), `expected day/hour reset format, got: ${plain}`);
+  assert.ok(/\(resets in \d+d( \d+h)?\)/.test(plain), `expected day/hour reset format, got: ${plain}`);
   assert.ok(!plain.includes('151h'), `should avoid raw hour format for long durations: ${plain}`);
 });
 
@@ -628,7 +628,7 @@ test('renderUsageLine shows 7d reset countdown in text-only mode', () => {
   const line = stripAnsi(renderUsageLine(ctx));
   assert.ok(line.includes('5h: 45%'), `should include 5h text-only usage: ${line}`);
   assert.ok(line.includes('7d: 85%'), `should include 7d text-only usage: ${line}`);
-  assert.ok(line.includes('(1d 4h)'), `should include 7d reset countdown in text-only mode: ${line}`);
+  assert.ok(line.includes('(resets in 1d 4h)'), `should include 7d reset countdown in text-only mode: ${line}`);
 });
 
 test('renderSessionLine displays limit reached warning', () => {

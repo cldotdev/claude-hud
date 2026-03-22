@@ -1,4 +1,5 @@
 import { getModelName } from '../../stdin.js';
+import { getOutputSpeed } from '../../speed-tracker.js';
 import { cyan, dim, magenta, yellow } from '../colors.js';
 export function renderProjectLine(ctx) {
     const display = ctx.config?.display;
@@ -61,6 +62,18 @@ export function renderProjectLine(ctx) {
     }
     if (display?.showSessionName && ctx.transcript.sessionName) {
         parts.push(dim(ctx.transcript.sessionName));
+    }
+    if (display?.showSpeed) {
+        const speed = getOutputSpeed(ctx.stdin);
+        if (speed !== null) {
+            parts.push(dim(`out: ${speed.toFixed(1)} tok/s`));
+        }
+    }
+    if (display?.showDuration !== false && ctx.sessionDuration) {
+        parts.push(dim(`⏱️  ${ctx.sessionDuration}`));
+    }
+    if (ctx.extraLabel) {
+        parts.push(dim(ctx.extraLabel));
     }
     if (parts.length === 0) {
         return null;

@@ -1,6 +1,7 @@
 import type { RenderContext } from '../types.js';
 import type { UsageData } from '../types.js';
 import { critical, dim, getQuotaColor, quotaBar, RESET } from './colors.js';
+import { getAdaptiveBarWidth } from '../utils/terminal.js';
 
 export function formatUsagePercent(percent: number | null, colors?: RenderContext['config']['colors']): string {
   if (percent === null) {
@@ -38,13 +39,14 @@ export function formatUsageDisplay(
   const fiveHourDisplay = formatUsagePercent(fiveHour, colors);
   const fiveHourReset = formatResetTime(fiveHourResetAt);
   const usageBarEnabled = display?.usageBarEnabled ?? true;
+  const barWidth = getAdaptiveBarWidth();
 
   const fiveHourPart = usageBarEnabled
     ? (fiveHourReset
-        ? `${quotaBar(fiveHour ?? 0, 10, colors)} ${fiveHourDisplay} (${fiveHourReset} / 5h)`
-        : `${quotaBar(fiveHour ?? 0, 10, colors)} ${fiveHourDisplay}`)
+        ? `${quotaBar(fiveHour ?? 0, barWidth, colors)} ${fiveHourDisplay} (resets in ${fiveHourReset})`
+        : `${quotaBar(fiveHour ?? 0, barWidth, colors)} ${fiveHourDisplay}`)
     : (fiveHourReset
-        ? `5h: ${fiveHourDisplay} (${fiveHourReset})`
+        ? `5h: ${fiveHourDisplay} (resets in ${fiveHourReset})`
         : `5h: ${fiveHourDisplay}`);
 
   const sevenDayThreshold = display?.sevenDayThreshold ?? 80;
@@ -53,10 +55,10 @@ export function formatUsageDisplay(
     const sevenDayReset = formatResetTime(sevenDayResetAt);
     const sevenDayPart = usageBarEnabled
       ? (sevenDayReset
-          ? `${quotaBar(sevenDay, 10, colors)} ${sevenDayDisplay} (${sevenDayReset} / 7d)`
-          : `${quotaBar(sevenDay, 10, colors)} ${sevenDayDisplay}`)
+          ? `${quotaBar(sevenDay, barWidth, colors)} ${sevenDayDisplay} (resets in ${sevenDayReset})`
+          : `${quotaBar(sevenDay, barWidth, colors)} ${sevenDayDisplay}`)
       : (sevenDayReset
-          ? `7d: ${sevenDayDisplay} (${sevenDayReset})`
+          ? `7d: ${sevenDayDisplay} (resets in ${sevenDayReset})`
           : `7d: ${sevenDayDisplay}`);
     return `${fiveHourPart} | ${sevenDayPart}`;
   }

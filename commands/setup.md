@@ -12,13 +12,14 @@ Check for inconsistent plugin state that can occur after failed installations:
 **macOS/Linux**:
 ```bash
 # Check 1: Cache exists?
-CACHE_EXISTS=$(ls -d ~/.claude/plugins/cache/claude-hud 2>/dev/null && echo "YES" || echo "NO")
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+CACHE_EXISTS=$(ls -d "$CLAUDE_DIR/plugins/cache/claude-hud" 2>/dev/null && echo "YES" || echo "NO")
 
 # Check 2: Registry entry exists?
-REGISTRY_EXISTS=$(grep -q "claude-hud" ~/.claude/plugins/installed_plugins.json 2>/dev/null && echo "YES" || echo "NO")
+REGISTRY_EXISTS=$(grep -q "claude-hud" "$CLAUDE_DIR/plugins/installed_plugins.json" 2>/dev/null && echo "YES" || echo "NO")
 
 # Check 3: Temp files left behind?
-TEMP_FILES=$(ls -d ~/.claude/plugins/cache/temp_local_* 2>/dev/null | head -1)
+TEMP_FILES=$(ls -d "$CLAUDE_DIR/plugins/cache/temp_local_"* 2>/dev/null | head -1)
 
 echo "Cache: $CACHE_EXISTS | Registry: $REGISTRY_EXISTS | Temp: ${TEMP_FILES:-none}"
 ```
@@ -48,15 +49,17 @@ If ghost installation detected, ask user if they want to reset. If yes:
 
 **macOS/Linux**:
 ```bash
+CLAUDE_DIR="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+
 # Remove orphaned cache
-rm -rf ~/.claude/plugins/cache/claude-hud
+rm -rf "$CLAUDE_DIR/plugins/cache/claude-hud"
 
 # Remove temp files from failed installs
-rm -rf ~/.claude/plugins/cache/temp_local_*
+rm -rf "$CLAUDE_DIR/plugins/cache/temp_local_"*
 
 # Reset registry (removes ALL plugins - warn user first!)
 # Only run if user confirms they have no other plugins they want to keep:
-echo '{"version": 2, "plugins": {}}' > ~/.claude/plugins/installed_plugins.json
+echo '{"version": 2, "plugins": {}}' > "$CLAUDE_DIR/plugins/installed_plugins.json"
 ```
 
 **Windows (PowerShell)**:
@@ -106,7 +109,7 @@ This is a [Claude Code platform limitation](https://github.com/anthropics/claude
 
 1. Get plugin path (sorted by dotted numeric version, not modification time):
    ```bash
-   ls -d "$HOME"/.claude/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '{ print $(NF-1) "\t" $0 }' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-
+   ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '{ print $(NF-1) "\t" $0 }' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-
    ```
    If empty, the plugin is not installed. Go back to Step 0 to check for ghost installation or EXDEV issues. If Step 0 was clean, tell user to install via `/plugin install claude-hud` first.
 
@@ -131,7 +134,7 @@ This is a [Claude Code platform limitation](https://github.com/anthropics/claude
 
 5. Generate command (quotes around runtime path handle spaces):
    ```
-   bash -c 'plugin_dir=$(ls -d "$HOME"/.claude/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '"'"'{ print $(NF-1) "\t" $0 }'"'"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec "{RUNTIME_PATH}" "${plugin_dir}{SOURCE}"'
+   bash -c 'plugin_dir=$(ls -d "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '"'"'{ print $(NF-1) "\t" $0 }'"'"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec "{RUNTIME_PATH}" "${plugin_dir}{SOURCE}"'
    ```
 
 **Windows** (Platform: `win32`):
@@ -249,7 +252,7 @@ Use AskUserQuestion:
    - Solution: re-detect with `command -v bun` or `command -v node`, and verify with `realpath {RUNTIME_PATH}` (or `readlink -f {RUNTIME_PATH}`) to get the true absolute path
 
    **"No such file or directory" for plugin**:
-   - Plugin might not be installed: `ls ~/.claude/plugins/cache/claude-hud/`
+   - Plugin might not be installed: `ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/claude-hud/"`
    - Solution: reinstall plugin via marketplace
 
    **Windows shell mismatch (for example, "bash not recognized")**:
@@ -264,6 +267,6 @@ Use AskUserQuestion:
 
    **WSL confusion**:
    - If using WSL, ensure plugin is installed in Linux environment, not Windows
-   - Check: `ls ~/.claude/plugins/cache/claude-hud/`
+   - Check: `ls "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/cache/claude-hud/"`
 
 4. **If still stuck**: Show the user the exact command that was generated and the error, so they can report it or debug further

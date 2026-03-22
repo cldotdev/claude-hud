@@ -27,7 +27,7 @@ export function formatUsageDisplay(
     const resetTime = fiveHour === 100
       ? formatResetTime(fiveHourResetAt)
       : formatResetTime(sevenDayResetAt);
-    return critical(`⚠ Limit reached${resetTime ? ` (resets ${resetTime})` : ''}`, colors);
+    return critical(`⚠ Limit reached${resetTime ? ` (${resetTime})` : ''}`, colors);
   }
 
   const threshold = display?.usageThreshold ?? 0;
@@ -43,10 +43,10 @@ export function formatUsageDisplay(
 
   const fiveHourPart = usageBarEnabled
     ? (fiveHourReset
-        ? `${quotaBar(fiveHour ?? 0, barWidth, colors)} ${fiveHourDisplay} (resets in ${fiveHourReset})`
+        ? `${quotaBar(fiveHour ?? 0, barWidth, colors)} ${fiveHourDisplay} (${fiveHourReset})`
         : `${quotaBar(fiveHour ?? 0, barWidth, colors)} ${fiveHourDisplay}`)
     : (fiveHourReset
-        ? `5h: ${fiveHourDisplay} (resets in ${fiveHourReset})`
+        ? `5h: ${fiveHourDisplay} (${fiveHourReset})`
         : `5h: ${fiveHourDisplay}`);
 
   const sevenDayThreshold = display?.sevenDayThreshold ?? 80;
@@ -55,10 +55,10 @@ export function formatUsageDisplay(
     const sevenDayReset = formatResetTime(sevenDayResetAt);
     const sevenDayPart = usageBarEnabled
       ? (sevenDayReset
-          ? `${quotaBar(sevenDay, barWidth, colors)} ${sevenDayDisplay} (resets in ${sevenDayReset})`
+          ? `${quotaBar(sevenDay, barWidth, colors)} ${sevenDayDisplay} (${sevenDayReset})`
           : `${quotaBar(sevenDay, barWidth, colors)} ${sevenDayDisplay}`)
       : (sevenDayReset
-          ? `7d: ${sevenDayDisplay} (resets in ${sevenDayReset})`
+          ? `7d: ${sevenDayDisplay} (${sevenDayReset})`
           : `7d: ${sevenDayDisplay}`);
     return `${fiveHourPart} | ${sevenDayPart}`;
   }

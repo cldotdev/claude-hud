@@ -5,52 +5,32 @@ import { renderAgentsLine } from './agents-line.js';
 import { renderTodosLine } from './todos-line.js';
 import { renderIdentityLine, renderProjectLine, renderEnvironmentLine, renderUsageLine, } from './lines/index.js';
 import { dim, RESET } from './colors.js';
+import { getTerminalWidth } from '../utils/terminal.js';
+// Matches ANSI escape sequences or runs of non-escape text in a single pass.
 // eslint-disable-next-line no-control-regex
-const ANSI_ESCAPE_PATTERN = /^\x1b\[[0-9;]*m/;
+const ANSI_OR_TEXT = /(\x1b\[[0-9;]*m)|([^\x1b]+)/g;
+// eslint-disable-next-line no-control-regex
 const ANSI_ESCAPE_GLOBAL = /\x1b\[[0-9;]*m/g;
+// eslint-disable-next-line no-control-regex
+const ANSI_AT_POS = /\x1b\[[0-9;]*m/y;
+const CONTROL_RE = /^\p{Control}$/u;
+const PICTOGRAPHIC_RE = /\p{Extended_Pictographic}/u;
+const MARK_RE = /^\p{Mark}$/u;
 const GRAPHEME_SEGMENTER = typeof Intl.Segmenter === 'function'
     ? new Intl.Segmenter(undefined, { granularity: 'grapheme' })
     : null;
 function stripAnsi(str) {
     return str.replace(ANSI_ESCAPE_GLOBAL, '');
 }
-function getTerminalWidth() {
-    const stdoutColumns = process.stdout?.columns;
-    if (typeof stdoutColumns === 'number' && Number.isFinite(stdoutColumns) && stdoutColumns > 0) {
-        return Math.floor(stdoutColumns);
-    }
-    // When running as a statusline subprocess, stdout is piped but stderr is
-    // still connected to the real terminal — use it to get the actual width.
-    const stderrColumns = process.stderr?.columns;
-    if (typeof stderrColumns === 'number' && Number.isFinite(stderrColumns) && stderrColumns > 0) {
-        return Math.floor(stderrColumns);
-    }
-    const envColumns = Number.parseInt(process.env.COLUMNS ?? '', 10);
-    if (Number.isFinite(envColumns) && envColumns > 0) {
-        return envColumns;
-    }
-    return null;
-}
 function splitAnsiTokens(str) {
     const tokens = [];
-    let i = 0;
-    while (i < str.length) {
-        const ansiMatch = ANSI_ESCAPE_PATTERN.exec(str.slice(i));
-        if (ansiMatch) {
-            tokens.push({ type: 'ansi', value: ansiMatch[0] });
-            i += ansiMatch[0].length;
-            continue;
+    for (const m of str.matchAll(ANSI_OR_TEXT)) {
+        if (m[1] !== undefined) {
+            tokens.push({ type: 'ansi', value: m[1] });
         }
-        let j = i;
-        while (j < str.length) {
-            const nextAnsi = ANSI_ESCAPE_PATTERN.exec(str.slice(j));
-            if (nextAnsi) {
-                break;
-            }
-            j += 1;
+        else if (m[2] !== undefined) {
+            tokens.push({ type: 'text', value: m[2] });
         }
-        tokens.push({ type: 'text', value: str.slice(i, j) });
-        i = j;
     }
     return tokens;
 }
@@ -78,17 +58,16 @@ function isWideCodePoint(codePoint) {
         (codePoint >= 0x20000 && codePoint <= 0x3FFFD));
 }
 function graphemeWidth(grapheme) {
-    if (!grapheme || /^\p{Control}$/u.test(grapheme)) {
+    if (!grapheme || CONTROL_RE.test(grapheme)) {
         return 0;
     }
-    // Emoji glyphs and ZWJ sequences generally render as double-width.
-    if (/\p{Extended_Pictographic}/u.test(grapheme)) {
+    if (PICTOGRAPHIC_RE.test(grapheme)) {
         return 2;
     }
     let hasVisibleBase = false;
     let width = 0;
     for (const char of Array.from(grapheme)) {
-        if (/^\p{Mark}$/u.test(char) || char === '\u200D' || char === '\uFE0F') {
+        if (MARK_RE.test(char) || char === '\u200D' || char === '\uFE0F') {
             continue;
         }
         hasVisibleBase = true;
@@ -120,44 +99,68 @@ function sliceVisible(str, maxVisible) {
     }
     let result = '';
     let visibleWidth = 0;
-    let done = false;
-    let i = 0;
-    while (i < str.length && !done) {
-        const ansiMatch = ANSI_ESCAPE_PATTERN.exec(str.slice(i));
-        if (ansiMatch) {
-            result += ansiMatch[0];
-            i += ansiMatch[0].length;
+    for (const m of str.matchAll(ANSI_OR_TEXT)) {
+        if (m[1] !== undefined) {
+            // ANSI escape -- pass through without counting width
+            result += m[1];
             continue;
         }
-        let j = i;
-        while (j < str.length) {
-            const nextAnsi = ANSI_ESCAPE_PATTERN.exec(str.slice(j));
-            if (nextAnsi) {
-                break;
-            }
-            j += 1;
-        }
-        const plainChunk = str.slice(i, j);
-        for (const grapheme of segmentGraphemes(plainChunk)) {
+        // Text run
+        const text = m[2];
+        for (const grapheme of segmentGraphemes(text)) {
             const graphemeCellWidth = graphemeWidth(grapheme);
             if (visibleWidth + graphemeCellWidth > maxVisible) {
-                done = true;
-                break;
+                return result;
             }
             result += grapheme;
             visibleWidth += graphemeCellWidth;
         }
-        i = j;
     }
     return result;
 }
 function truncateToWidth(str, maxWidth) {
-    if (maxWidth <= 0 || visualLength(str) <= maxWidth) {
+    if (maxWidth <= 0) {
         return str;
     }
+    // Single-pass: measure total visible width while accumulating the
+    // sliced-to-keep prefix.  If the string fits, return it as-is without
+    // ever building the truncated version.
     const suffix = maxWidth >= 3 ? '...' : '.'.repeat(maxWidth);
     const keep = Math.max(0, maxWidth - suffix.length);
-    return `${sliceVisible(str, keep)}${suffix}${RESET}`;
+    let totalWidth = 0;
+    let keepResult = '';
+    let keepWidth = 0;
+    let keepDone = false;
+    for (const m of str.matchAll(ANSI_OR_TEXT)) {
+        if (m[1] !== undefined) {
+            // ANSI escape -- zero width, always include in keepResult
+            if (!keepDone) {
+                keepResult += m[1];
+            }
+            continue;
+        }
+        const text = m[2];
+        for (const grapheme of segmentGraphemes(text)) {
+            const w = graphemeWidth(grapheme);
+            totalWidth += w;
+            if (!keepDone) {
+                if (keepWidth + w > keep) {
+                    keepDone = true;
+                }
+                else {
+                    keepResult += grapheme;
+                    keepWidth += w;
+                }
+            }
+            if (keepDone && totalWidth > maxWidth) {
+                return `${keepResult}${suffix}${RESET}`;
+            }
+        }
+    }
+    if (totalWidth <= maxWidth) {
+        return str;
+    }
+    return `${keepResult}${suffix}${RESET}`;
 }
 function splitLineBySeparators(line) {
     const segments = [];
@@ -165,20 +168,32 @@ function splitLineBySeparators(line) {
     let currentStart = 0;
     let i = 0;
     while (i < line.length) {
-        const ansiMatch = ANSI_ESCAPE_PATTERN.exec(line.slice(i));
+        // Use sticky regex to check for ANSI escape at current position
+        ANSI_AT_POS.lastIndex = i;
+        const ansiMatch = ANSI_AT_POS.exec(line);
         if (ansiMatch) {
-            i += ansiMatch[0].length;
+            i = ANSI_AT_POS.lastIndex;
             continue;
         }
-        const separator = line.startsWith(' | ', i)
-            ? ' | '
-            : (line.startsWith(' │ ', i) ? ' │ ' : null);
-        if (separator) {
-            segments.push(line.slice(currentStart, i));
-            separators.push(separator);
-            i += separator.length;
-            currentStart = i;
-            continue;
+        // Check for separator patterns by comparing characters directly.
+        // ' | ' is 3 chars; ' \u2502 ' is 5 bytes but 3 code points.
+        if (line.charCodeAt(i) === 0x20 /* space */) {
+            if (line.charCodeAt(i + 1) === 0x7C /* | */ &&
+                line.charCodeAt(i + 2) === 0x20 /* space */) {
+                segments.push(line.slice(currentStart, i));
+                separators.push(' | ');
+                i += 3;
+                currentStart = i;
+                continue;
+            }
+            if (line.charCodeAt(i + 1) === 0x2502 /* │ */ &&
+                line.charCodeAt(i + 2) === 0x20 /* space */) {
+                segments.push(line.slice(currentStart, i));
+                separators.push(' │ ');
+                i += 3;
+                currentStart = i;
+                continue;
+            }
         }
         i += 1;
     }
@@ -253,27 +268,9 @@ function makeSeparator(length) {
 }
 const ACTIVITY_ELEMENTS = new Set(['tools', 'agents', 'todos']);
 function collectActivityLines(ctx) {
-    const activityLines = [];
-    const display = ctx.config?.display;
-    if (display?.showTools !== false) {
-        const toolsLine = renderToolsLine(ctx);
-        if (toolsLine) {
-            activityLines.push(toolsLine);
-        }
-    }
-    if (display?.showAgents !== false) {
-        const agentsLine = renderAgentsLine(ctx);
-        if (agentsLine) {
-            activityLines.push(agentsLine);
-        }
-    }
-    if (display?.showTodos !== false) {
-        const todosLine = renderTodosLine(ctx);
-        if (todosLine) {
-            activityLines.push(todosLine);
-        }
-    }
-    return activityLines;
+    return [...ACTIVITY_ELEMENTS]
+        .map(el => renderElementLine(ctx, el))
+        .filter((line) => line !== null);
 }
 function renderElementLine(ctx, element) {
     const display = ctx.config?.display;
@@ -382,4 +379,5 @@ export function render(ctx) {
         console.log(outputLine);
     }
 }
+export { splitAnsiTokens, visualLength, sliceVisible, splitLineBySeparators, truncateToWidth };
 //# sourceMappingURL=index.js.map

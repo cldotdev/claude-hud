@@ -34,19 +34,23 @@ export async function main(overrides = {}) {
             }
             return;
         }
-        const transcriptPath = stdin.transcript_path ?? '';
-        const transcript = await deps.parseTranscript(transcriptPath);
-        const { claudeMdCount, rulesCount, mcpCount, hooksCount } = await deps.countConfigs(stdin.cwd);
+        // Load config and count configs first (both are sync I/O, fast local reads)
         const config = await deps.loadConfig();
-        const gitStatus = config.gitStatus.enabled
-            ? await deps.getGitStatus(stdin.cwd)
-            : null;
-        // Only fetch usage if enabled in config (replaces env var requirement)
+        const { claudeMdCount, rulesCount, mcpCount, hooksCount } = await deps.countConfigs(stdin.cwd);
+        const transcriptPath = stdin.transcript_path ?? '';
+        const extraCmd = deps.parseExtraCmdArg();
+        // Parallelize truly async operations (subprocess spawns, file streaming)
+        const [transcript, gitStatus, extraLabel] = await Promise.all([
+            deps.parseTranscript(transcriptPath).catch(() => ({ tools: [], agents: [], todos: [] })),
+            config.gitStatus.enabled
+                ? deps.getGitStatus(stdin.cwd).catch(() => null)
+                : Promise.resolve(null),
+            extraCmd ? deps.runExtraCmd(extraCmd).catch(() => null) : Promise.resolve(null),
+        ]);
+        // Only fetch usage if enabled in config
         const usageData = config.display.showUsage !== false
             ? deps.extractUsage(stdin)
             : null;
-        const extraCmd = deps.parseExtraCmdArg();
-        const extraLabel = extraCmd ? await deps.runExtraCmd(extraCmd) : null;
         const sessionDuration = formatSessionDuration(transcript.sessionStart, deps.now);
         const ctx = {
             stdin,

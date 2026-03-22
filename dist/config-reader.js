@@ -4,62 +4,57 @@ import * as os from 'os';
 import { createDebug } from './debug.js';
 import { getClaudeConfigDir, getClaudeConfigJsonPath } from './claude-config-dir.js';
 const debug = createDebug('config');
-function getMcpServerNames(filePath) {
-    if (!fs.existsSync(filePath))
-        return new Set();
+/**
+ * Read and parse a JSON file with per-invocation caching.
+ * Returns the parsed object, or null if the file does not exist or is invalid.
+ * Non-existence is cached too (null stored) so we never stat/read a missing file twice.
+ */
+export function readJsonFileCached(filePath, cache) {
+    if (cache.has(filePath)) {
+        return cache.get(filePath);
+    }
+    let result = null;
     try {
         const content = fs.readFileSync(filePath, 'utf8');
-        const config = JSON.parse(content);
-        if (config.mcpServers && typeof config.mcpServers === 'object') {
-            return new Set(Object.keys(config.mcpServers));
+        const parsed = JSON.parse(content);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            result = parsed;
         }
     }
     catch (error) {
-        debug(`Failed to read MCP servers from ${filePath}:`, error);
+        if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+            debug(`Failed to read/parse ${filePath}:`, error);
+        }
     }
-    return new Set();
+    cache.set(filePath, result);
+    return result;
 }
-function getDisabledMcpServers(filePath, key) {
-    if (!fs.existsSync(filePath))
+function getMcpServerNamesFromConfig(config) {
+    if (!config)
         return new Set();
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const config = JSON.parse(content);
-        if (Array.isArray(config[key])) {
-            const validNames = config[key].filter((s) => typeof s === 'string');
-            if (validNames.length !== config[key].length) {
-                debug(`${key} in ${filePath} contains non-string values, ignoring them`);
-            }
-            return new Set(validNames);
-        }
-    }
-    catch (error) {
-        debug(`Failed to read ${key} from ${filePath}:`, error);
+    if (config.mcpServers && typeof config.mcpServers === 'object') {
+        return new Set(Object.keys(config.mcpServers));
     }
     return new Set();
 }
-function countMcpServersInFile(filePath, excludeFrom) {
-    const servers = getMcpServerNames(filePath);
-    if (excludeFrom) {
-        const exclude = getMcpServerNames(excludeFrom);
-        for (const name of exclude) {
-            servers.delete(name);
+function getDisabledMcpServersFromConfig(config, key, label) {
+    if (!config)
+        return new Set();
+    if (Array.isArray(config[key])) {
+        const arr = config[key];
+        const validNames = arr.filter((s) => typeof s === 'string');
+        if (validNames.length !== arr.length) {
+            debug(`${key} in ${label} contains non-string values, ignoring them`);
         }
+        return new Set(validNames);
     }
-    return servers.size;
+    return new Set();
 }
-function countHooksInFile(filePath) {
-    if (!fs.existsSync(filePath))
+function countHooksFromConfig(config) {
+    if (!config)
         return 0;
-    try {
-        const content = fs.readFileSync(filePath, 'utf8');
-        const config = JSON.parse(content);
-        if (config.hooks && typeof config.hooks === 'object') {
-            return Object.keys(config.hooks).length;
-        }
-    }
-    catch (error) {
-        debug(`Failed to read hooks from ${filePath}:`, error);
+    if (config.hooks && typeof config.hooks === 'object') {
+        return Object.keys(config.hooks).length;
     }
     return 0;
 }
@@ -114,6 +109,8 @@ export async function countConfigs(cwd) {
     let hooksCount = 0;
     const homeDir = os.homedir();
     const claudeDir = getClaudeConfigDir(homeDir);
+    // Per-invocation cache: each JSON config file is read at most once
+    const cache = new Map();
     // Collect all MCP servers across scopes, then subtract disabled ones
     const userMcpServers = new Set();
     const projectMcpServers = new Set();
@@ -125,18 +122,20 @@ export async function countConfigs(cwd) {
     // ~/.claude/rules/*.md
     rulesCount += countRulesInDir(path.join(claudeDir, 'rules'));
     // ~/.claude/settings.json (MCPs and hooks)
-    const userSettings = path.join(claudeDir, 'settings.json');
-    for (const name of getMcpServerNames(userSettings)) {
+    const userSettingsPath = path.join(claudeDir, 'settings.json');
+    const userSettingsConfig = readJsonFileCached(userSettingsPath, cache);
+    for (const name of getMcpServerNamesFromConfig(userSettingsConfig)) {
         userMcpServers.add(name);
     }
-    hooksCount += countHooksInFile(userSettings);
+    hooksCount += countHooksFromConfig(userSettingsConfig);
     // {CLAUDE_CONFIG_DIR}.json (additional user-scope MCPs)
-    const userClaudeJson = getClaudeConfigJsonPath(homeDir);
-    for (const name of getMcpServerNames(userClaudeJson)) {
+    const userClaudeJsonPath = getClaudeConfigJsonPath(homeDir);
+    const userClaudeJsonConfig = readJsonFileCached(userClaudeJsonPath, cache);
+    for (const name of getMcpServerNamesFromConfig(userClaudeJsonConfig)) {
         userMcpServers.add(name);
     }
     // Get disabled user-scope MCPs from ~/.claude.json
-    const disabledUserMcps = getDisabledMcpServers(userClaudeJson, 'disabledMcpServers');
+    const disabledUserMcps = getDisabledMcpServersFromConfig(userClaudeJsonConfig, 'disabledMcpServers', userClaudeJsonPath);
     for (const name of disabledUserMcps) {
         userMcpServers.delete(name);
     }
@@ -169,24 +168,28 @@ export async function countConfigs(cwd) {
             rulesCount += countRulesInDir(path.join(cwd, '.claude', 'rules'));
         }
         // {cwd}/.mcp.json (project MCP config) - tracked separately for disabled filtering
-        const mcpJsonServers = getMcpServerNames(path.join(cwd, '.mcp.json'));
+        const mcpJsonPath = path.join(cwd, '.mcp.json');
+        const mcpJsonConfig = readJsonFileCached(mcpJsonPath, cache);
+        const mcpJsonServers = getMcpServerNamesFromConfig(mcpJsonConfig);
         // {cwd}/.claude/settings.json (project settings)
         // Skip when it overlaps with user-scope settings.
-        const projectSettings = path.join(cwd, '.claude', 'settings.json');
+        const projectSettingsPath = path.join(cwd, '.claude', 'settings.json');
         if (!projectClaudeOverlapsUserScope) {
-            for (const name of getMcpServerNames(projectSettings)) {
+            const projectSettingsConfig = readJsonFileCached(projectSettingsPath, cache);
+            for (const name of getMcpServerNamesFromConfig(projectSettingsConfig)) {
                 projectMcpServers.add(name);
             }
-            hooksCount += countHooksInFile(projectSettings);
+            hooksCount += countHooksFromConfig(projectSettingsConfig);
         }
         // {cwd}/.claude/settings.local.json (local project settings)
-        const localSettings = path.join(cwd, '.claude', 'settings.local.json');
-        for (const name of getMcpServerNames(localSettings)) {
+        const localSettingsPath = path.join(cwd, '.claude', 'settings.local.json');
+        const localSettingsConfig = readJsonFileCached(localSettingsPath, cache);
+        for (const name of getMcpServerNamesFromConfig(localSettingsConfig)) {
             projectMcpServers.add(name);
         }
-        hooksCount += countHooksInFile(localSettings);
+        hooksCount += countHooksFromConfig(localSettingsConfig);
         // Get disabled .mcp.json servers from settings.local.json
-        const disabledMcpJsonServers = getDisabledMcpServers(localSettings, 'disabledMcpjsonServers');
+        const disabledMcpJsonServers = getDisabledMcpServersFromConfig(localSettingsConfig, 'disabledMcpjsonServers', localSettingsPath);
         for (const name of disabledMcpJsonServers) {
             mcpJsonServers.delete(name);
         }

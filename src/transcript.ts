@@ -2,6 +2,12 @@ import * as fs from 'fs';
 import * as readline from 'readline';
 import type { TranscriptData, ToolEntry, AgentEntry, TodoItem } from './types.js';
 
+/** Files larger than this use tail-read strategy */
+export const TAIL_THRESHOLD = 256 * 1024; // 256KB
+
+/** How many bytes to read from the end of large files */
+export const TAIL_SIZE = 64 * 1024; // 64KB
+
 interface TranscriptLine {
   timestamp?: string;
   type?: string;
@@ -21,74 +27,151 @@ interface ContentBlock {
   is_error?: boolean;
 }
 
+interface ParseState {
+  result: TranscriptData;
+  toolMap: Map<string, ToolEntry>;
+  agentMap: Map<string, AgentEntry>;
+  taskIdToIndex: Map<string, number>;
+  latestTodos: TodoItem[];
+}
+
 export async function parseTranscript(transcriptPath: string): Promise<TranscriptData> {
-  const result: TranscriptData = {
-    tools: [],
-    agents: [],
-    todos: [],
+  const state: ParseState = {
+    result: { tools: [], agents: [], todos: [] },
+    toolMap: new Map(),
+    agentMap: new Map(),
+    taskIdToIndex: new Map(),
+    latestTodos: [],
   };
 
-  if (!transcriptPath || !fs.existsSync(transcriptPath)) {
-    return result;
-  }
+  if (!transcriptPath) return state.result;
 
-  const toolMap = new Map<string, ToolEntry>();
-  const agentMap = new Map<string, AgentEntry>();
-  let latestTodos: TodoItem[] = [];
-  const taskIdToIndex = new Map<string, number>();
   let latestSlug: string | undefined;
   let customTitle: string | undefined;
 
-  try {
-    const fileStream = fs.createReadStream(transcriptPath);
-    const rl = readline.createInterface({
-      input: fileStream,
-      crlfDelay: Infinity,
-    });
+  const updateMeta = (entry: TranscriptLine): void => {
+    if (entry.type === 'custom-title' && typeof entry.customTitle === 'string') {
+      customTitle = entry.customTitle;
+    } else if (typeof entry.slug === 'string') {
+      latestSlug = entry.slug;
+    }
+  };
 
-    for await (const line of rl) {
-      if (!line.trim()) continue;
+  try {
+    const stat = fs.statSync(transcriptPath);
+
+    if (stat.size > TAIL_THRESHOLD) {
+      parseLargeFile(transcriptPath, stat.size, state, updateMeta);
+    } else {
+      const fileStream = fs.createReadStream(transcriptPath);
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
+        if (!line.trim()) continue;
+
+        try {
+          const entry = JSON.parse(line) as TranscriptLine;
+          updateMeta(entry);
+          processEntry(entry, state);
+        } catch {
+          // Skip malformed lines
+        }
+      }
+    }
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+      return state.result;
+    }
+    // Return partial results on other errors
+  }
+
+  state.result.tools = Array.from(state.toolMap.values()).slice(-20);
+  state.result.agents = Array.from(state.agentMap.values()).slice(-10);
+  state.result.todos = state.latestTodos;
+  state.result.sessionName = customTitle ?? latestSlug;
+
+  return state.result;
+}
+
+/**
+ * Parse a large transcript file by reading just the first line (for sessionStart)
+ * and the last TAIL_SIZE bytes (for recent tool/agent/todo activity).
+ */
+function parseLargeFile(
+  filePath: string,
+  fileSize: number,
+  state: ParseState,
+  onMeta: (entry: TranscriptLine) => void,
+): void {
+  const fd = fs.openSync(filePath, 'r');
+  try {
+    // Read first line for sessionStart
+    const firstLineBuffer = Buffer.allocUnsafe(4096);
+    const firstReadBytes = fs.readSync(fd, firstLineBuffer, 0, 4096, 0);
+    const firstChunk = firstLineBuffer.subarray(0, firstReadBytes).toString('utf-8');
+    const newlineIndex = firstChunk.indexOf('\n');
+    const firstLine = newlineIndex >= 0 ? firstChunk.slice(0, newlineIndex) : firstChunk;
+
+    if (firstLine.trim()) {
+      try {
+        const entry = JSON.parse(firstLine) as TranscriptLine;
+        if (entry.timestamp) {
+          state.result.sessionStart = new Date(entry.timestamp);
+        }
+        onMeta(entry);
+      } catch {
+        // Skip malformed first line
+      }
+    }
+
+    // Read tail for recent entries
+    const tailStart = Math.max(0, fileSize - TAIL_SIZE);
+    const tailLength = fileSize - tailStart;
+    const tailBuffer = Buffer.allocUnsafe(tailLength);
+    fs.readSync(fd, tailBuffer, 0, tailLength, tailStart);
+    const tailText = tailBuffer.toString('utf-8');
+    const tailLines = tailText.split('\n');
+
+    // Skip the first line of the tail — likely a partial line
+    const startIndex = tailStart > 0 ? 1 : 0;
+
+    for (let i = startIndex; i < tailLines.length; i++) {
+      const line = tailLines[i].trim();
+      if (!line) continue;
 
       try {
         const entry = JSON.parse(line) as TranscriptLine;
-        if (entry.type === 'custom-title' && typeof entry.customTitle === 'string') {
-          customTitle = entry.customTitle;
-        } else if (typeof entry.slug === 'string') {
-          latestSlug = entry.slug;
-        }
-        processEntry(entry, toolMap, agentMap, taskIdToIndex, latestTodos, result);
+        onMeta(entry);
+        processEntry(entry, state);
       } catch {
         // Skip malformed lines
       }
     }
-  } catch {
-    // Return partial results on error
+  } finally {
+    fs.closeSync(fd);
   }
-
-  result.tools = Array.from(toolMap.values()).slice(-20);
-  result.agents = Array.from(agentMap.values()).slice(-10);
-  result.todos = latestTodos;
-  result.sessionName = customTitle ?? latestSlug;
-
-  return result;
 }
 
-function processEntry(
-  entry: TranscriptLine,
-  toolMap: Map<string, ToolEntry>,
-  agentMap: Map<string, AgentEntry>,
-  taskIdToIndex: Map<string, number>,
-  latestTodos: TodoItem[],
-  result: TranscriptData
-): void {
-  const timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date();
+function processEntry(entry: TranscriptLine, state: ParseState): void {
+  const { result, toolMap, agentMap, taskIdToIndex, latestTodos } = state;
 
   if (!result.sessionStart && entry.timestamp) {
-    result.sessionStart = timestamp;
+    result.sessionStart = new Date(entry.timestamp);
   }
 
   const content = entry.message?.content;
   if (!content || !Array.isArray(content)) return;
+
+  let timestamp: Date | undefined;
+  const getTimestamp = (): Date => {
+    if (!timestamp) {
+      timestamp = entry.timestamp ? new Date(entry.timestamp) : new Date();
+    }
+    return timestamp;
+  };
 
   for (const block of content) {
     if (block.type === 'tool_use' && block.id && block.name) {
@@ -97,7 +180,7 @@ function processEntry(
         name: block.name,
         target: extractTarget(block.name, block.input),
         status: 'running',
-        startTime: timestamp,
+        startTime: getTimestamp(),
       };
 
       if (block.name === 'Task') {
@@ -108,7 +191,7 @@ function processEntry(
           model: (input?.model as string) ?? undefined,
           description: (input?.description as string) ?? undefined,
           status: 'running',
-          startTime: timestamp,
+          startTime: getTimestamp(),
         };
         agentMap.set(block.id, agentEntry);
       } else if (block.name === 'TodoWrite') {
@@ -158,13 +241,13 @@ function processEntry(
       const tool = toolMap.get(block.tool_use_id);
       if (tool) {
         tool.status = block.is_error ? 'error' : 'completed';
-        tool.endTime = timestamp;
+        tool.endTime = getTimestamp();
       }
 
       const agent = agentMap.get(block.tool_use_id);
       if (agent) {
         agent.status = 'completed';
-        agent.endTime = timestamp;
+        agent.endTime = getTimestamp();
       }
     }
   }
@@ -182,9 +265,11 @@ function extractTarget(toolName: string, input?: Record<string, unknown>): strin
       return input.pattern as string;
     case 'Grep':
       return input.pattern as string;
-    case 'Bash':
-      const cmd = input.command as string;
-      return cmd?.slice(0, 30) + (cmd?.length > 30 ? '...' : '');
+    case 'Bash': {
+      const cmd = input.command as string | undefined;
+      if (!cmd) return undefined;
+      return cmd.slice(0, 30) + (cmd.length > 30 ? '...' : '');
+    }
   }
   return undefined;
 }

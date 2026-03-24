@@ -17,8 +17,15 @@ Real-time statusline showing context usage, active tools, running agents, and to
 ```
 
 **Step 3: Configure the statusline**
-```
-/claude-hud:setup
+
+Add to `~/.claude/settings.json`:
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash -c 'plugin_dir=$(ls -d \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '\"'\"'{ print $(NF-1) \"\\t\" $0 }'\"'\"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec node \"${plugin_dir}dist/index.js\"'"
+  }
+}
 ```
 
 Done. The HUD appears immediately — no restart needed.
@@ -56,12 +63,7 @@ Run this command in Claude Code:
 
 ### Step 4: Configure the Statusline
 
-Run this command in Claude Code:
-```
-/claude-hud:setup
-```
-
-This adds the statusLine configuration to the user's settings.json.
+Add the `statusLine` configuration to the user's `~/.claude/settings.json` (see the "For Humans" section above for the JSON snippet).
 
 ### Step 5: Inform User
 
@@ -243,8 +245,8 @@ Technical documentation for agents who need to understand, modify, or debug Clau
   <note>The plugin.json contains metadata only. statusLine is NOT a valid plugin.json field.</note>
 
   <statusline_config>
-    The /claude-hud:setup command adds statusLine to ~/.claude/settings.json with an auto-updating command that finds the latest installed version.
-    Updates are automatic - no need to re-run setup after updating the plugin.
+    The statusLine configuration must be added manually to ~/.claude/settings.json. The command dynamically finds the latest installed version.
+    Updates are automatic - no need to reconfigure after updating the plugin.
   </statusline_config>
 </plugin_configuration>
 
@@ -297,7 +299,7 @@ Technical documentation for agents who need to understand, modify, or debug Clau
     <cause>Plugin not installed or statusLine not configured</cause>
     <solution>Run: /plugin marketplace add jarrodwatts/claude-hud</solution>
     <solution>Run: /plugin install claude-hud</solution>
-    <solution>Run: /claude-hud:setup</solution>
+    <solution>Add statusLine config to ~/.claude/settings.json (see setup instructions)</solution>
     <solution>Ensure Claude Code is v1.0.80 or later</solution>
   </issue>
 

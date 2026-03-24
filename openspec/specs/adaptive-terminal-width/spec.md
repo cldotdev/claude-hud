@@ -70,24 +70,9 @@ The system SHALL display a macOS-specific hint when the HUD initializes without 
 - **WHEN** the HUD initializes without stdin and the platform is macOS (darwin)
 - **THEN** the output SHALL include a note about restarting Claude Code
 
-### Requirement: CLAUDE_CONFIG_DIR support in setup
-The setup command SHALL respect the `CLAUDE_CONFIG_DIR` environment variable when locating the plugin cache, registry, and settings files.
-
-#### Scenario: Custom config directory
-- **WHEN** `CLAUDE_CONFIG_DIR` is set to a non-default path
-- **THEN** setup SHALL use that path instead of `~/.claude`
-
-#### Scenario: Default config directory
-- **WHEN** `CLAUDE_CONFIG_DIR` is not set
-- **THEN** setup SHALL use `$HOME/.claude` as default
-
-### Requirement: Plugin command registration
-The plugin manifest SHALL declare its command files so Claude Code can resolve skill invocations. The package.json SHALL declare included files for proper npm packaging.
-
-#### Scenario: Plugin commands discoverable
-- **WHEN** Claude Code looks up plugin commands
-- **THEN** plugin.json SHALL list `./commands/setup.md` and `./commands/configure.md`
+### Requirement: Package includes necessary files
+The package.json SHALL declare included files for proper npm packaging.
 
 #### Scenario: Package includes necessary files
 - **WHEN** the package is distributed via npm
-- **THEN** package.json SHALL include `dist/`, `src/`, `commands/`, and `.claude-plugin/` in the files array
+- **THEN** package.json SHALL include `dist/`, `src/`, and `.claude-plugin/` in the files array

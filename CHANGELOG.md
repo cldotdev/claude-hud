@@ -4,6 +4,9 @@ All notable changes to Claude HUD will be documented in this file.
 
 ## [Unreleased]
 
+### Removed
+- **BREAKING**: `/claude-hud:setup` and `/claude-hud:configure` slash commands — configure manually via settings.json and config.json
+
 ## [0.0.10] - 2026-03-14
 
 ### Added

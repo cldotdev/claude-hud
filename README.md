@@ -40,8 +40,16 @@ Then run the install command below in that session. This is a [Claude Code platf
 ```
 
 **Step 3: Configure the statusline**
-```
-/claude-hud:setup
+
+Add the following to `~/.claude/settings.json`:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash -c 'plugin_dir=$(ls -d \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}\"/plugins/cache/claude-hud/claude-hud/*/ 2>/dev/null | awk -F/ '\"'\"'{ print $(NF-1) \"\\t\" $0 }'\"'\"' | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n | tail -1 | cut -f2-); exec node \"${plugin_dir}dist/index.js\"'"
+  }
+}
 ```
 
 Done! The HUD appears immediately — no restart needed.
@@ -70,7 +78,7 @@ Context █████░░░░░ 45% │ Usage ██░░░░░░░
 - **Line 1** — Model (or `Bedrock`), project path, git branch
 - **Line 2** — Context bar (green → yellow → red) and usage rate limits
 
-### Optional lines (enable via `/claude-hud:configure`)
+### Optional lines (enable via config.json)
 ```
 ◐ Edit: auth.ts | ✓ Read ×3 | ✓ Grep ×2        ← Tools activity
 ◐ explore [haiku]: Finding auth code (2m 15s)    ← Agent status
@@ -98,33 +106,8 @@ Claude Code → stdin JSON → claude-hud → stdout → displayed in your termi
 
 ## Configuration
 
-Customize your HUD anytime:
-
-```
-/claude-hud:configure
-```
-
-The guided flow handles layout and display toggles. Advanced overrides such as
-custom colors and thresholds are preserved there, but you set them by editing the config file directly:
-
-- **First time setup**: Choose a preset (Full/Essential/Minimal), then fine-tune individual elements
-- **Customize anytime**: Toggle items on/off, adjust git display style, switch layouts
-- **Preview before saving**: See exactly how your HUD will look before committing changes
-
-### Presets
-
-| Preset | What's Shown |
-|--------|--------------|
-| **Full** | Everything enabled — tools, agents, todos, git, usage, duration |
-| **Essential** | Activity lines + git status, minimal info clutter |
-| **Minimal** | Core only — just model name and context bar |
-
-After choosing a preset, you can turn individual elements on or off.
-
-### Manual Configuration
-
-Edit `~/.claude/plugins/claude-hud/config.json` directly for advanced settings such as `colors.*`,
-`pathLevels`, and threshold overrides. Running `/claude-hud:configure` preserves those manual settings.
+Edit `~/.claude/plugins/claude-hud/config.json` to customize your HUD. Advanced settings such as `colors.*`,
+`pathLevels`, and threshold overrides are also supported.
 
 ### Options
 
@@ -232,7 +215,7 @@ To disable, set `display.showUsage` to `false`.
 **Config not applying?**
 - Check for JSON syntax errors: invalid JSON silently falls back to defaults
 - Ensure valid values: `pathLevels` must be 1, 2, or 3; `lineLayout` must be `expanded` or `compact`
-- Delete config and run `/claude-hud:configure` to regenerate
+- Delete config and recreate `~/.claude/plugins/claude-hud/config.json`
 
 **Git status missing?**
 - Verify you're in a git repository
